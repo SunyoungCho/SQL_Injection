@@ -83,9 +83,6 @@ def find_table_rows_count(url, method, headers, cookies, data, vuln_field,
 
 def print_user_choice_table(values, title = ''):
     
-    if len(values) == 0:
-        print('Empty value')
-        raise Exception
     if len(values) == 1:
         print('Only one value')
         print('Choice: %s' % values[0])
@@ -182,7 +179,6 @@ def measure_request_time(url, method, headers, cookies, data):
             threads.append(t)
         for t in threads:
             t.join()
-        print(times)
         return avg_time(times)
 
 def find_vuln_fields(url, method, headers, cookies, data, sleep_time):
