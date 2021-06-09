@@ -82,33 +82,32 @@ def find_table_rows_count(url, method, headers, cookies, data, vuln_field,
     return count
 
 def print_user_choice_table(values, title = ''):
-    try:
-        if len(values) == 0:
-            print('Empty value')
-            raise Exception
-        if len(values) == 1:
-            print('Only one value')
-            print('Choice: %s' % values[0])
-            return 0
-        if title:
-            print(title)
+    
+    if len(values) == 0:
+        print('Empty value')
+        raise Exception
+    if len(values) == 1:
+        print('Only one value')
+        print('Choice: %s' % values[0])
+        return 0
+    if title:
+        print(title)
 
-        for i in range(len(values)):
-            print(str(i+1) + ' - ' + values[i])
-        print('\n')
+    for i in range(len(values)):
+        print(str(i+1) + ' - ' + values[i])
+    print('\n')
 
-        choice = -1
-        while choice < 0 or choice >= (len(values)):
-            print('\033[A                             \033[A')
-            try:
-                choice = int(input('Choice[1 - ' + str(len(values)) + ']:')) - 1
-            except Exception as e:
-                choice = -1
-                pass
+    choice = -1
+    while choice < 0 or choice >= (len(values)):
+        print('\033[A                             \033[A')
+        try:
+            choice = int(input('Choice[1 - ' + str(len(values)) + ']:')) - 1
+        except Exception as e:
+            choice = -1
+            pass
 
-        return choice
-    except Exception:
-        quit()
+    return choice
+
 
 def avg_time(times):
     if len(times) == 1:
@@ -136,7 +135,6 @@ def evaluate_response_time(url, method, headers, cookies, data):
     times = []
     for i in range(EVALUATING_ROUNDS):
         times.append(measure_request_time(url, method, headers, cookies, data))
-    print(times)
     return avg_time(times)
 
 def evaluate_sleep_time(response_time):
@@ -184,6 +182,7 @@ def measure_request_time(url, method, headers, cookies, data):
             threads.append(t)
         for t in threads:
             t.join()
+        print(times)
         return avg_time(times)
 
 def find_vuln_fields(url, method, headers, cookies, data, sleep_time):
@@ -423,11 +422,12 @@ def main(argv):
         databases.append(find_data(url, method, headers, cookies, data, sel_vuln_field, sel_vuln_type, INFORMATION_SCHEMA_DB_NAME, INF_SCHEMA_SCHEMATA, INF_SCHEMA_SCHEMATA_SCHEMA_NAME, sleep_time, i))
         print('Found: %s' % databases[i])
         
+    print("\n")
     elapsed = time.time() - start_time
-    times = str(datetime.timedelta(seconds=elapsed)).split(".")
-    times = times[0]
-    print('elapsed time: %s' % times)
-    #######################
+    times_datbases = str(datetime.timedelta(seconds=elapsed)).split(".")
+    times_datbases = times_datbases[0]
+    print('elapsed time: %s' % times_datbases)
+    print('\n')
 
     choice = print_user_choice_table(databases, 'Databases found:')
     db_name = databases[choice]
@@ -446,6 +446,13 @@ def main(argv):
     table_name = tables[choice]
     print('\nTable selected: %s\n' % table_name)
 
+    print("\n")
+    elapsed = time.time() - start_time
+    times_tables = str(datetime.timedelta(seconds=elapsed)).split(".")
+    times_tables = times_tables[0]
+    print('elapsed time: %s' % times_tables)
+    print('\n')
+    
     print('Looking for columns in %s, please wait...\n' % table_name)
     where_params = [INF_SCHEMA_COLUMNS_TABLE_NAME, INF_SCHEMA_COLUMNS_TABLE_SCHEMA]
     where_values = [table_name, db_name]
@@ -455,7 +462,13 @@ def main(argv):
         columns.append(find_data(url, method, headers, cookies, data, sel_vuln_field, sel_vuln_type, INFORMATION_SCHEMA_DB_NAME, INF_SCHEMA_COLUMNS, INF_SCHEMA_COLUMNS_COLUMN_NAME, sleep_time, i, where_params, where_values, where_conjunction))
 
     print(columns)
-    ###########################################
+    
+    print("\n")
+    elapsed = time.time() - start_time
+    times_columns = str(datetime.timedelta(seconds=elapsed)).split(".")
+    times_columns = times_columns[0]
+    print('elapsed time: %s' % times_columns)
+    print('\n')
 
     print('\nLooking for %s data, please wait...\n' % table_name)
     rows_count = find_table_rows_count(url, method, headers, cookies, data, sel_vuln_field, sel_vuln_type, db_name, table_name, sleep_time)
@@ -475,7 +488,18 @@ def main(argv):
     for row in results:
         print(row)
 
+    print("\n")
+    elapsed = time.time() - start_time
+    times_data = str(datetime.timedelta(seconds=elapsed)).split(".")
+    times_data = times_data[0]
+    print('elapsed time: %s' % times_data)
+    print('\n')
+
 
 if __name__ == "__main__":
     start_time = time.time()
     main(sys.argv[1:])
+    elapsed = time.time() - start_time
+    times_total = str(datetime.timedelta(seconds=elapsed)).split(".")
+    times_total = times_total[0]
+    print("Total elapsed time: %s" % times_total)
