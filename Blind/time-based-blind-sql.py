@@ -179,7 +179,7 @@ def measure_request_time(url, method, headers, cookies, data):
             threads.append(t)
         for t in threads:
             t.join()
-        print(times)
+        # print(times)
         return avg_time(times)
 
 def find_vuln_fields(url, method, headers, cookies, data, sleep_time):
