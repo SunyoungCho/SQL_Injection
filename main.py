@@ -4,7 +4,7 @@ from tkinter import Label, LabelFrame, Toplevel, ttk
 from Blind import Time_Based_SQL_Injection as timeBasedInjection
 from Blind import Blind_SQL_Injection as booleanInjection
 #from Error import Error_Based_SQL as errorBasedInjection
-#from Query import Query_Based_SQL_Injection as queryBasedInjection
+from Query import Union_Query_Based_SQL_Injection as queryBasedInjection
 #from Stacked_Query import Stacked_Query_SQL as stckedQueryInjection
 
 
@@ -32,8 +32,15 @@ class Injection(Toplevel):
             self.getCMbtn = tkinter.Button(self, text="Get Columns", command=lambda: [timeBasedInjection.find_column_name(self.columnList, self.urlTbox.get(), cookies, self.tableComboBox.get()), self.refresh()], width=11)
             self.getDPbtn = tkinter.Button(self, text="Dump", command=lambda: [timeBasedInjection.dump_data(self.urlTbox.get(),cookies, self.tableComboBox.get(), self.columnList), self.refresh()], width=11)
         elif type == "Blind":
-            self.getDBbtn = tkinter.Button(self, text="Get Databases", command=lambda: booleanInjection.find_id_len(self.urlTbox.get(),cookies), width=11, height=1)
-        # elif type == "Error":
+            self.getDBbtn = tkinter.Button(self, text="Get Databases", command=lambda: [booleanInjection.find_db_name(self.dbList, self.urlTbox.get(),cookies), self.refresh()], width=11, height=1)
+            self.getTBbtn = tkinter.Button(self, text="Get Tables", command=lambda: [booleanInjection.find_table_name(self.tableList, self.urlTbox.get(), cookies, self.dbComboBox.get()), self.refresh()], width=11)
+            self.getCMbtn = tkinter.Button(self, text="Get Columns", command=lambda: [booleanInjection.find_column_name(self.columnList, self.urlTbox.get(), cookies, self.tableComboBox.get()), self.refresh()], width=11)
+            self.getDPbtn = tkinter.Button(self, text="Dump", command=lambda: [booleanInjection.dump_data(self.urlTbox.get(),cookies, self.tableComboBox.get(), self.columnList), self.refresh()], width=11)
+        elif type == "Union Query":
+            self.getDBbtn = tkinter.Button(self, text="Get Databases", command=lambda: [queryBasedInjection.find_db_name(self.dbList, self.urlTbox.get(),cookies), self.refresh()], width=11, height=1)
+            self.getTBbtn = tkinter.Button(self, text="Get Tables", command=lambda: [queryBasedInjection.find_table_name(self.tableList, self.urlTbox.get(), cookies, self.dbComboBox.get()), self.refresh()], width=11)
+            self.getCMbtn = tkinter.Button(self, text="Get Columns", command=lambda: [queryBasedInjection.find_column_name(self.columnList, self.urlTbox.get(), cookies, self.dbComboBox.get(), self.tableComboBox.get()), self.refresh()], width=11)
+            self.getDPbtn = tkinter.Button(self, text="Dump", command=lambda: [queryBasedInjection.dump_data(self.urlTbox.get(),cookies, self.dbComboBox.get(), self.tableComboBox.get(), self.columnList), self.refresh()], width=11)
 
         # else:
 
@@ -97,7 +104,7 @@ errorInjectionBtn = tkinter.Button(mainWindow, text="Error Based SQL Injection",
 errorInjectionBtn.grid(row=0, column=1)
 timeInjectionBtn = tkinter.Button(mainWindow, text="Time Based SQL Injection", command=lambda: Injection(mainWindow, "Time"))
 timeInjectionBtn.grid(row=1, column=0)
-stackedInjectionBtn = tkinter.Button(mainWindow, text="Query Based SQL Injection", command=lambda: Injection(mainWindow, "Query"))
+stackedInjectionBtn = tkinter.Button(mainWindow, text="Query Based SQL Injection", command=lambda: Injection(mainWindow, "Union Query"))
 stackedInjectionBtn.grid(row=1, column=1)
 
 mainWindow.mainloop()
